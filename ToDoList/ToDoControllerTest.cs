@@ -1,31 +1,38 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
-using System.Collections.Generic;
+using Microsoft.EntityFrameworkCore.Storage;
 using ToDolistAPI.Controllers;
 using ToDolistAPI.DbContext;
 using ToDolistAPI.Models;
 
 namespace ToDoList
 {
-    public class ToDoControllerTests: IDisposable
+    using System;
+    using NUnit.Framework;
+    public class ToDoControllerTests : IDisposable
     {
+        private DbContextOptions<ToDoContext> options;
+        private ToDoContext ToDoContext;
+        private ToDoController _ToDoController;
+
         [SetUp]
         public void Setup()
         {
-        }
-        private ToDoController _ToDoController;
-        private ToDoContext _ToDoContext;
-        private DbContextOptions<ToDoContext> _options = new DbContextOptionsBuilder<ToDoContext>().UseInMemoryDatabase(databaseName:"TestDatabase").Options;
-        
-
-        public ToDoControllerTests() {
-        _ToDoContext = new ToDoContext(_options);
-        _ToDoController = new ToDoController(_ToDoContext);
-
+            options = new DbContextOptionsBuilder<ToDoContext>()
+                .UseInMemoryDatabase(Guid.NewGuid().ToString(), new InMemoryDatabaseRoot())
+                .Options;
+            ToDoContext = new ToDoContext(options);
+            _ToDoController = new ToDoController(ToDoContext);
         }
 
-        [Test]
+
+
+        [TearDown] public void Cleanup() {
+            Dispose();
+
+        }
+
+            [Test]
         public async Task ToDoController_GetToDoItems_ReturnIEnumerable()
         {
             //Arrange
@@ -33,8 +40,9 @@ namespace ToDoList
             {
                 new ToDoItem { Title = "Task 1", Description = "Description 1" },
                 new ToDoItem { Title = "Task 2", Description = "Description 2" },
+                new ToDoItem { Title = "Task 3", Description = "Description 3" },
             };
-            using (var _ToDoContext = new ToDoContext(_options))
+            using (var _ToDoContext = new ToDoContext(options))
             {
             
             await _ToDoContext.AddRangeAsync(items);
@@ -47,7 +55,8 @@ namespace ToDoList
 
 
             //Assert
-            Assert.IsInstanceOf<IEnumerable<ToDoItem>>(result.Value);            
+            Assert.IsInstanceOf<IEnumerable<ToDoItem>>(result.Value);
+            Assert.That(result.Value.Count,Is.EqualTo(3));
            
           
         }
@@ -62,7 +71,7 @@ namespace ToDoList
                 new ToDoItem { Title = "Task 1", Description = "Description 1" },
                 new ToDoItem { Title = "Task 2", Description = "Description 2" },
             };
-            using (var _ToDoContext = new ToDoContext(_options))
+            using (var _ToDoContext = new ToDoContext(options))
             {
 
                 await _ToDoContext.AddRangeAsync(items);
@@ -89,27 +98,28 @@ namespace ToDoList
                 Title = "Task 1", Description = "Description 1"
                 
             };
-            using (var _ToDoContext = new ToDoContext(_options))
-            {
-
-                await _ToDoContext.AddAsync(item);
-                await _ToDoContext.SaveChangesAsync();
-            };
-
             var item1 = new ToDoItem
             {
                 Title = "Task 1",
                 Description = "Description 1"
 
             };
+            using (var _ToDoContext = new ToDoContext(options))
+            {
+
+                await _ToDoContext.AddAsync(item);
+                await _ToDoContext.SaveChangesAsync();
+            };
+
+            
 
             //Act
-            var result = await _ToDoController.PostToDoItem(item1);
+            var result = await _ToDoController.PostToDoItem(item1);            
 
-            //Assert
-            
-            Assert.IsInstanceOf<CreatedAtActionResult>(result.Result);
-            
+            //Assert         
+           
+            Assert.IsInstanceOf<CreatedAtActionResult>(result.Result);            
+
 
 
         }
@@ -125,7 +135,7 @@ namespace ToDoList
                 Description = "Description 1"
 
             };
-            using (var _ToDoContext = new ToDoContext(_options))
+            using (var _ToDoContext = new ToDoContext(options))
             {
 
                 await _ToDoContext.AddAsync(item);
@@ -143,7 +153,7 @@ namespace ToDoList
             var result = await _ToDoController.PutToDoItem(id,ItemToUpdated);
 
             //Assert
-            using (var context = new ToDoContext(_options))
+            using (var context = new ToDoContext(options))
             {
                 var updatedItem = await context.TodoItems.FindAsync(id);
                 Assert.IsNotNull(updatedItem);
@@ -157,9 +167,12 @@ namespace ToDoList
 
         public void Dispose()
         {
-            using (var context = new ToDoContext(_options))
+            using (var context = new ToDoContext(options))
             {
-                context.Database.EnsureDeleted();
+                if (context.Database.IsInMemory()){
+                    context.Database.EnsureDeleted();
+                }
+                
             }
         }
     }

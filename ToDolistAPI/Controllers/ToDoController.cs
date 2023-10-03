@@ -41,7 +41,6 @@ namespace ToDolistAPI.Controllers
         {
             _context.TodoItems.Add(item);
             await _context.SaveChangesAsync();
-
             return CreatedAtAction(nameof(GetToDoItem), new { id = item.Id }, item);
         }
 
